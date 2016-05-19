@@ -18,7 +18,8 @@ struct {
 void readSettings()
  {
   ifstream f;
-    string FileName = "settings_Europe.ini";
+  //"..\..\..\..\g4mUAwoodtypes_v_1_0"+
+  string FileName = "settings_Europe.ini";
   f.open(FileName.c_str(), ios::in);
   if (!f.is_open()) {
     cout << "Cannot read " << FileName << endl;
