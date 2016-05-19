@@ -78,7 +78,7 @@ float BEF(int forType, float growingStockC, float tC_m3 = 4)
 	return bef;
 }
 
-float BEF_(int forType, float growingStockC, float tC_m3 = 4, float woodDensity = 1)
+float BEF(int forType, float growingStockC, float tC_m3 = 4, float woodDensity = 1)
 {
 //	float growingStockBiomass = growingStock * woodDensity;
   float growingStock = growingStockC * tC_m3;
