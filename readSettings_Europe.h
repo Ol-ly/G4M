@@ -18,7 +18,7 @@ struct {
 void readSettings()
  {
   ifstream f;
-  string FileName = "C:/Docs/G4M/G4M_diff/_G4M_versions/g4m_WoodTypes_UA_project/_ProgramFiles/_/settings_Europe.ini";
+  string FileName = "settings_Europe.ini";
   f.open(FileName.c_str(), ios::in);
   if (!f.is_open()) {
     cout << "Cannot read " << FileName << endl;
