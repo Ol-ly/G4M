@@ -53,6 +53,7 @@ namespace g4m {
     ~ageStruct();
     std::deque<double> qMai;  //Queue to store the mai's of previous years (youngest mai is at the end of que)
     double createNormalForest(double rotationPeriod, double area, double sd=1.);
+	double REcreateNormalForest(double rotationPeriod, double area, double sd=1.);//MG: Clear dat and create normal forest with new parameters
     double getBm(double age);    //get biomass per ha by age
     double getBm();              //get average biomass per ha
     double getArea(int age);//get forest area by ageclass
@@ -106,8 +107,16 @@ namespace g4m {
     double u;       //Rotation time
     unsigned int getMaxAge();
     unsigned int setMaxAge(unsigned int maxAge);
-    int getActiveAge(); //MG: added : Find "active Age" - the oldest cohort with area>0    
-    private:
+    int getActiveAge(); //MG: added : Find "active Age" - the oldest age class with area>0   
+	float ageStruct::getDBHthinned();//MG: BM weighted average diameter of harvested (at thinning) trees
+    float ageStruct::getHthinned();//MG: BM weighted average height of harvested (at thinning) trees
+	void ageStruct::clearCohort();// MG: force to clear cohort
+	float ageStruct::getAvgNetInc();//MG:  net annual increment averaged over all age classes
+	float ageStruct::getAvgGrossInc();//MG:  gross annual increment averaged over all age classes
+	float ageStruct::getU();// MG: get rotation time
+	float ageStruct::getStockingdegree();// MG: get stocking degree ([StockingdegreeMin+StockingdegreeMax]/2)
+
+  private:
     incrementTab *it;
     ffipol<double> *sws;
     ffipol<double> *hlv;
@@ -134,6 +143,12 @@ namespace g4m {
     double setMinRot();   //Set the minimal rotation time "minRot"
     double timeStep; //How long is one time step
     double flexSd;
+	float hh; //MG: average height of trees in age classes that are thinned
+	float hdbh;//MG: average diameter of trees in age classes that are thinned
+	float netInc;//MG:  net annual increment averaged over all age classes, tC/(ha year)
+	float grossInc;//MG:  gross annual increment averaged over all age classes, tC/(ha year)
+	float area_replant; // MG: area to be replanted if Bm==0 in age classes >0
+
     struct cohort {
       double area; //Forest area
       double bm;   //Biomass
