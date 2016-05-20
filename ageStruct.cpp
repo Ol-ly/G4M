@@ -163,6 +163,19 @@ namespace g4m {
     return(area);
   }
 
+  double ageStruct::REcreateNormalForest
+	(double rotationPeriod, double aarea, double sd) {
+    for(unsigned int i=0; i<dat.size(); ++i) {
+      dat[i].area = 0.;
+	  dat[i].bm = 0.;
+	  dat[i].d = 0.;
+	  dat[i].h = 0.;
+    }
+	dat.resize(1);
+	createNormalForest(rotationPeriod, aarea, sd);
+	return(area);
+  }
+
   double ageStruct::getD(double age) {
     age /= timeStep;
     unsigned int ageH = ceil(age);
@@ -403,19 +416,42 @@ namespace g4m {
     return(dat[0].area);
   }
 
+/*
   double ageStruct::reforest(double aarea) {
     if(dat.size() < 2) {
       int oldSize=dat.size();
       dat.resize(2);
       initCohort(oldSize, 2);
     }
-    if(area > 0) {
+//    if(area > 0) {
+    if(aarea > 0) {  //MG:
       dat[0].area += aarea/2.;
       dat[1].area += aarea/2.;
       area += aarea;
     }
     return(dat[0].area + dat[1].area);
   }
+*/
+
+//MG: correct problem with 0 biomass in 1st age class
+// Proposed by Georg 21 August 2015
+  double ageStruct::reforest(double aarea) {
+    if(dat.size() < 2) {
+      int oldSize=dat.size();
+      dat.resize(2);
+      initCohort(oldSize, 2);
+    }
+    if(aarea > 0) {
+      dat[0].area += aarea/2.;
+      dat[1].bm = (dat[1].bm * dat[1].area +
+it->gBmSdTab(0.5*timeStep, mai, 1) * aarea/2.) / (dat[1].area +
+aarea/2.);
+      dat[1].area += aarea/2.;
+      area += aarea;
+    }
+    return(dat[0].area + dat[1].area);
+  }
+
 
   ageStruct::v ageStruct::deforest(double aarea, int type) {
     v ret = {0., 0., 0., 0., 0.};
@@ -429,9 +465,18 @@ namespace g4m {
             double sdNat = it->gSdNat(i*timeStep, avgMai, dat[i].bm);
             double dbm = it->gIncBmSdNat(i*timeStep, avgMai, sdNat)/2.;
             double id = it->gIncDbhSdNat(i*timeStep, avgMai, sdNat)/2.;
+//if (dbm<0 || id<0 || dbm>100 || id > 100) {cout<<"agestruct:"<<"\tcellid="<<cellid<<"\tdbm/id 1:"<<"\tsdNat=\t"<<sdNat<<"\tdbm=\t"<<dbm<<"\tid=\t"<<id<<"\tdat[i].bm=\t"<<dat[i].bm<<"\tavgMai="<<avgMai<<"\ti*timeStep="<<i*timeStep<<"\tdat.size()=\t"<<dat.size()<<endl;} //MG: test
+//if (dbm>100 || id > 100) {cout<<"agestruct:"<<"\tcellid="<<cellid<<"\tdbm/id 1:"<<"\tsdNat=\t"<<sdNat<<"\tdbm=\t"<<dbm<<"\tid=\t"<<id<<"\tdat[i].bm=\t"<<dat[i].bm<<"\tavgMai="<<avgMai<<"\ti*timeStep="<<i*timeStep<<"\tdat.size()=\t"<<dat.size()<<endl;} //MG: test
+//if (dbm<0) {dbm=0;} if (dbm>dat[i].bm*(1./sqrt(i+1.))) {dbm=dat[i].bm*(1./sqrt(i+1.));}// MG:: temporal fix. Must correct the tables!
+//if (id<0) {id=0;} if (id>dat[i].d*(1./sqrt(i+1.))) {id=dat[i].d*(1./sqrt(i+1.));}// MG:: temporal fix. Must correct the tables!
+if (dbm<0) {dbm=0;} //MG: we don't allow negative increments (suggestion of Geogr 25 March 2013) 
+if (id<0) {id=0;} //MG: we don't allow negative increments (suggestion of Geogr 25 March 2013) 
+if (dat[i].bm<0) dat[i].bm=0; // MG: we don't allow negative biomass in any age group
+
             dbhBm[0] = dat[i].d+id; dbhBm[1] = dat[i].bm+dbm;
             double totalWood = dat[i].area * (1.-mul) * dbhBm[1];
             ret.bm += totalWood;
+//            ret.bm += totalWood * 10000; MG: test
             double harvestedWood = totalWood * hle->g(dbhBm[0]);
             double sawnWood = harvestedWood * sws->g(dbhBm[0]);
             ret.sw += sawnWood;
@@ -444,7 +489,8 @@ namespace g4m {
         ret.area=aarea;
       }
       if(ret.area > 0.) { //Values per hectare
-        ret.sw /= area; ret.rw /= area; ret.co /= area; ret.bm /= area;}
+//      ret.sw /= area; ret.rw /= area; ret.co /= area; ret.bm /= area;} // MG: wrong area (left after deforestation) 21.12.2014!
+      ret.sw /= ret.area; ret.rw /= ret.area; ret.co /= ret.area; ret.bm /= ret.area;} //MG: now per ha of deforested land
     } else { //Take from the old age classes
       ret =  finalCut(aarea, false);
     }
@@ -462,6 +508,14 @@ namespace g4m {
         double sdNat = it->gSdNat(i*timeStep, avgMai, dat[i].bm);
         double dbm = it->gIncBmSdNat(i*timeStep, avgMai, sdNat)/2.;
         double id = it->gIncDbhSdNat(i*timeStep, avgMai, sdNat)/2.;
+//if (dat[i].bm<0 || dat[i].bm>400 || dbm>30) {cout<<"agestruct:"<<"\tcellid="<<cellid<<"\tdbm/id 2:"<<"\tsdNat=\t"<<sdNat<<"\tdbm=\t"<<dbm<<"\tid=\t"<<id<<"\tdat[i].bm=\t"<<dat[i].bm<<"\tavgMai="<<avgMai<<"\ti*timeStep="<<i*timeStep<<"\tdat.size()=\t"<<dat.size()<<endl;} //MG: test
+//if (dbm<0 || id<0 || dbm>100 || id > 100) {cout<<"agestruct:"<<"\tcellid="<<cellid<<"\tdbm/id 3:"<<"\tsdNat=\t"<<sdNat<<"\tdbm=\t"<<dbm<<"\tid=\t"<<id<<"\tdat[i].bm=\t"<<dat[i].bm<<"\tavgMai="<<avgMai<<"\ti*timeStep="<<i*timeStep<<"\tdat.size()=\t"<<dat.size()<<endl;} //MG: test
+//if (dbm>100 || id > 100) {cout<<"agestruct:"<<"\tcellid="<<cellid<<"\tdbm/id 3:"<<"\tsdNat=\t"<<sdNat<<"\tdbm=\t"<<dbm<<"\tid=\t"<<id<<"\tdat[i].bm=\t"<<dat[i].bm<<"\tavgMai="<<avgMai<<"\ti*timeStep="<<i*timeStep<<"\tdat.size()=\t"<<dat.size()<<endl;} //MG: test
+//if (dbm<0) {dbm=0;} if (dbm>dat[i].bm*(1./sqrt(i+1.))) {dbm=dat[i].bm*(1./sqrt(i+1.));}// MG:: temporal fix. Must correct the tables!
+//if (id<0) {id=0;} if (id>dat[i].d*(1./sqrt(i+1.))) {id=dat[i].d*(1./sqrt(i+1.));}// MG:: temporal fix. Must correct the tables!
+if (dbm<0) {dbm=0;} //MG: we don't allow negative increments (suggestion of Geogr 25 March 2013) 
+if (id<0) {id=0;} //MG: we don't allow negative increments (suggestion of Geogr 25 March 2013) 
+if (dat[i].bm<0) dat[i].bm=0; // MG: we don't allow negative biomass in any age group
         dbhBm[0] = dat[i].d+id; dbhBm[1] = dat[i].bm+dbm;
         if(doe->g(dbhBm) || eco==false) { //do harvest if it is economic
           if(aarea >=0) { //Given area to harvest
@@ -480,6 +534,8 @@ namespace g4m {
             ret.bm += totalWood;
             double harvestedWood = totalWood * hle->g(dbhBm[0]);
             double sawnWood = harvestedWood * sws->g(dbhBm[0]);
+//cout<<"agestruct: sawnWood=\t"<<sawnWood<<"\tharvestedWood=\t"<<harvestedWood<<"\ttotalWood=\t"<<totalWood<<"\thle=\t"<<hle->g(dbhBm[0])<<"\tsws=\t"<<sws->g(dbhBm[0])<<"\tsdNat=\t"<<sdNat<<"\tdbm=\t"<<dbm<<"\tid=\t"<<id<<"\tdat[i].bm=\t"<<dat[i].bm<<endl;
+if (harvestedWood<0 || harvestedWood>200 || sawnWood<0 || sawnWood>200 || dat[i].bm<0 || dat[i].bm>400) cout<<"agestruct:"<<"\tcellid="<<cellid<<"\tsawnWood=\t"<<sawnWood<<"\tharvestedWood=\t"<<harvestedWood<<"\ttotalWood=\t"<<totalWood<<"\thle=\t"<<hle->g(dbhBm[0])<<"\tsws=\t"<<sws->g(dbhBm[0])<<"\tsdNat=\t"<<sdNat<<"\tdbm=\t"<<dbm<<"\tid=\t"<<id<<"\tdat[i].bm=\t"<<dat[i].bm<<"\tharea=\t"<<aarea - ret.area<<endl;
             ret.sw += sawnWood;
             ret.rw += harvestedWood - sawnWood;
             ret.co += totalWood * coe->g(dbhBm);
@@ -555,7 +611,8 @@ namespace g4m {
     }
     //Make reforestations on final harvested area
     reforest(retHarvest.area); //Maybe include also reforestation costs
-    return(std::make_pair(retThin, retHarvest));
+//    reforest(retHarvest.area+area_replant); //Maybe include also reforestation costs
+	return(std::make_pair(retThin, retHarvest));
   }
 
   ageStruct::v ageStruct::thinAndGrow() {
@@ -570,7 +627,17 @@ namespace g4m {
 
   ageStruct::v ageStruct::thinAndGrowStatic() {
     v ret = {0., 0., 0., 0., 0.};
-    for(int i = static_cast<int>(dat.size())-2; i>-1; --i) {
+	float shbm=0;//MG: sum of BM in age classes which are thinned
+	float sumArea=0;//MG: sum of area of all age classes
+	hdbh=0;hh=0;//MG: average diameter and height of trees in age classes that are thinned
+	netInc=0;//MG:  net annual increment averaged over all age classes
+	grossInc=0;//MG:  gross annual increment averaged over all age classes
+	area_replant=0; // MG: area to be replanted if Bm==0 in age classes >0
+//    for(int i = static_cast<int>(dat.size())-2; i>-1; --i) { //11.05.2016 MG: Why we don't thin and grow the oldest age class????
+    for(int i = static_cast<int>(dat.size())-1; i>-1; --i) { //11.05.2016 MG:Thin and grow the oldest age class
+
+//	  if (i>2 && dat[i].area > 0. && dat[i].bm<=0) {area_replant += dat[i].area; dat[i].area=0;cout<<"age=\t"<<i<<"\toldestAge=\t"<<getActiveAge()<<"\tarea_replant=\t"<<area_replant<<"\tmai=\t"<<mai<<"\tgwl=\t"<<it->gIncGwlt(i*timeStep, mai)<<endl;} // MG: we replant stands with 0 biomass
+
       if(dat[i].area > 0.) {
         double sd, iGwl, bmT, id;
         incStatic(i, sd, iGwl, bmT, id);
@@ -579,6 +646,9 @@ namespace g4m {
           bmT = bmT * (1. - flexSd) + bmTCom * flexSd;
         }
         double totalWood = dat[i].area * (iGwl - (bmT-dat[i].bm));
+		float bm_cur = dat[i].bm;//MG: current biomass before growth
+//		if (dat[i].area>0 && dat[i].bm==0) cout<<"PROBLEME in age class "<<i<<endl;
+
         if(totalWood < 0.) {totalWood = 0.;}
         static std::vector<double> dbhBmSh(3,0);
         dbhBmSh[0] = dat[i].d+id/2.;
@@ -593,15 +663,26 @@ namespace g4m {
           ret.rw += harvestedWood - sawnWood;
           ret.co += totalWood * cov->g(dbhBmSh);
           dat[i].bm += iGwl - totalWood/dat[i].area;
+//		  if ((iGwl - totalWood/dat[i].area)<0) cout<<"PROBLEME in age class "<<i<<"\tiGwl=\t"<<iGwl<<"\ttotalWood=\t"<<totalWood<<"\tarea=\t"<<dat[i].area<<"\tbbm=\t"<<bm<<"\tabm=\t"<<dat[i].bm<<"\tdiff=\t"<<iGwl - totalWood/dat[i].area<<endl;
+//		  if (dat[i].area>0 && dat[i].bm==0 && i>4) cout<<"PROBLEME in age class "<<i<<"\tsd=\t"<<sd<<"\sdMax=\t"<<sdMax<<endl;
+		  hdbh+=dat[i].d*dat[i].bm;hh+=dat[i].h*dat[i].bm;shbm+=dat[i].bm; //MG: estimation of BM weighted average d and h of harvested (at thinning) trees
         } else {  //No thinning
           dat[i].bm += iGwl;
           double bmMax = it->gBm((i+1)*timeStep, avgMai);
           if(dat[i].bm > bmMax) {dat[i].bm = bmMax;}
+//		  if (dat[i].area>0 && dat[i].bm==0) cout<<"PROBLEM in age class "<<i<<"\tbmMax=\t"<<bmMax<<endl;
         }
         dat[i].d += id;
         dat[i].h += it->gIncHeight(i*timeStep, avgMai);
+		netInc += dat[i].area * (dat[i].bm-bm_cur);//MG
+//		netInc += dat[i].area * (bmT-dat[i].bm);MG:
+//		if ((bmT-dat[i].bm)>40) cout<<"PROBLEM!!\t"<<"\ti=\t"<<i<<"\tbmT=\t"<<bmT<<"\tbm=\t"<<dat[i].bm<<"\tarea=\t"<<dat[i].area<<endl;
+		grossInc += dat[i].area * iGwl;//MG:
+		sumArea += dat[i].area;//MG:
       }
     }
+	if (shbm>0) {hdbh /= shbm; hh /= shbm;}else{hdbh=0;hh=0;}//MG: estimation of BM weighted average d and h of harvested (at thinning) trees
+	if (sumArea>0) {netInc /= sumArea; grossInc /= sumArea;}else{netInc=0;grossInc=0;}//MG: estimation of net and gross increments averaged over all age classes for timeStep, tC/(ha timeStep)
     cohortShift();
     return(ret);
   }
@@ -669,7 +750,9 @@ namespace g4m {
         if(static_cast<unsigned int>(i+2) < maxNumberOfAgeClasses) { //Add one more age class
           unsigned int oldSize = dat.size();
           dat.resize(i+3);
-          initCohort(oldSize, i+2);
+//          initCohort(oldSize, i+2);
+          initCohort(oldSize, i+3);// MG BUG: new class is not populated by bm and d data !!! corrected 15.04.2016
+		  dat[i+2] = dat[i+1]; //MG BUG: disappears area of last age class !!! corected 15.04.2016
           dat[i+1] = dat[i];
         } else { //It would be good to allow one more age class
           dat[i+1].d = (dat[i+1].d * dat[i+1].area + dat[i].d * dat[i].area) / (dat[i+1].area + dat[i].area);
@@ -838,11 +921,49 @@ namespace g4m {
       int i = static_cast<int>(dat.size())-1;
       while(dat[i].area == 0 && i>0) {--i;}
       while(dat[i].area != 0 && i<static_cast<int>(dat.size())-1) {++i;}
-    int activeAge = int((static_cast<int>(dat.size())-1) * timeStep);
+//    int activeAge = int((static_cast<int>(dat.size())-1) * timeStep);
+    int activeAge = (i-1) * timeStep;
     return(activeAge);
 
   }
+float ageStruct::getDBHthinned()
+	{//MG: BM weighted average diameter of harvested (at thinning) trees
+	return(hdbh);
+	}
+
+float ageStruct::getHthinned()
+	{//MG: BM weighted average height of harvested (at thinning) trees
+	return(hh);
+	}
+
+float ageStruct::getAvgNetInc()
+	{//MG:  net annual increment averaged over all age classes, tC/(ha year)
+	return(netInc/timeStep);
+	}
+float ageStruct::getAvgGrossInc()
+	{//MG:  gross annual increment averaged over all age classes, tC/(ha year)
+	return(grossInc/timeStep);
+	}
+float ageStruct::getU()
+	{//MG:  get rotation time, years
+	return(u);
+	}
+float ageStruct::getStockingdegree()
+	{//MG:  get rotation time, years
+	return((sdMin+sdMax)/2);
+	}
+
+void ageStruct::clearCohort()
+	{//MG: force to clear cohorts
+    it = NULL;
+    sws = NULL;
+    hlv = NULL;
+    hle = NULL;
+    cov = NULL;
+    coe = NULL;
+    dov = NULL;
+    doe = NULL;
+  	}
 
 }
-
 #endif
